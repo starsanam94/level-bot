@@ -9,7 +9,6 @@ from telegram.ext import (
 users = {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
     users[user_id] = users.get(user_id, 1)
     await update.message.reply_text(
         f"Welcome {update.effective_user.first_name}! 🎉\nYour level is {users[user_id]}"
