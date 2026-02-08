@@ -1,50 +1,46 @@
-from flask import Flask, jsonify, request
-import uuid
-import time
+from flask import Flask, request, jsonify
+import random
+import string
 
 app = Flask(__name__)
 
-# in-memory key store (simple)
-KEY_DB = {}
-
-KEY_VALIDITY_SECONDS = 24 * 60 * 60  # 24 hours
+# yahan keys save hongi
+VALID_KEYS = set()
 
 @app.route("/")
 def home():
     return "Level Bot Server is Running ✅"
 
-@app.route("/generate-key", methods=["GET"])
+@app.route("/generate-key")
 def generate_key():
-    key = str(uuid.uuid4())
-    expiry = int(time.time()) + KEY_VALIDITY_SECONDS
-    KEY_DB[key] = expiry
+    key = "LVL-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=12))
+    VALID_KEYS.add(key)
+
     return jsonify({
         "key": key,
-        "expires_in_hours": 24
+        "owner": "YourNameHere"
     })
 
-@app.route("/verify-key", methods=["GET"])
-def verify_key():
-    key = request.args.get("key")
-    if not key:
-        return jsonify({"status": "error", "msg": "key required"}), 400
-
-    expiry = KEY_DB.get(key)
-    if not expiry:
-        return jsonify({"status": "invalid", "msg": "key not found"}), 401
-
-    if time.time() > expiry:
-        return jsonify({"status": "expired", "msg": "key expired"}), 401
-
-    return jsonify({"status": "valid", "msg": "key is valid"})
-    @app.route("/verify-key")
+@app.route("/verify-key")
 def verify_key():
     key = request.args.get("key")
 
     if not key:
-        return {"status": "missing_key"}
+        return jsonify({
+            "status": "missing",
+            "msg": "key parameter required"
+        })
 
-    if key.startswith("LVL-"):
-        return {"status": "valid"}
+    if key in VALID_KEYS:
+        return jsonify({
+            "status": "valid",
+            "msg": "key verified"
+        })
 
-    return {"status": "invalid"}
+    return jsonify({
+        "status": "invalid",
+        "msg": "key not found"
+    })
+
+if __name__ == "__main__":
+    app.run()
