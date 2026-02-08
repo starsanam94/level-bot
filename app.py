@@ -37,3 +37,14 @@ def verify_key():
         return jsonify({"status": "expired", "msg": "key expired"}), 401
 
     return jsonify({"status": "valid", "msg": "key is valid"})
+    @app.route("/verify-key")
+def verify_key():
+    key = request.args.get("key")
+
+    if not key:
+        return {"status": "missing_key"}
+
+    if key.startswith("LVL-"):
+        return {"status": "valid"}
+
+    return {"status": "invalid"}
