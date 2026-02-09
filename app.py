@@ -1,104 +1,54 @@
 from flask import Flask, request, jsonify
-import os
+import uuid
 import time
 
 app = Flask(__name__)
 
-# ====== OWNER SETTINGS ======
-OWNER_TOKEN = os.getenv("OWNER_TOKEN", "change-this-owner-token")
-APP_NAME = "Level Bot Backend"
+# simple in-memory key store (baad me database laga sakte hain)
+KEYS = {}
 
-# ====== DUMMY DATABASE (in-memory) ======
-# real project me isko DB (SQLite/Mongo) me shift kar sakte ho
-KEYS_DB = {
-    "ABC123": {
-        "active": True,
-        "created": int(time.time()),
-        "note": "test key"
-    },
-    "VIP999": {
-        "active": True,
-        "created": int(time.time()),
-        "note": "vip key"
-    }
-}
+OWNER_SECRET = "my_owner_password"  # 🔴 isko apna strong password bana lena
 
-# ====== HOME ======
-@app.route("/", methods=["GET"])
+@app.route("/")
 def home():
+    return "Server is running 🔥"
+
+# 🔑 generate key (sirf owner ke liye)
+@app.route("/generate-key", methods=["GET"])
+def generate_key():
+    owner = request.args.get("owner")
+
+    if owner != OWNER_SECRET:
+        return jsonify({"error": "unauthorized"}), 401
+
+    key = str(uuid.uuid4()).replace("-", "").upper()
+    KEYS[key] = {
+        "created": int(time.time()),
+        "active": True
+    }
+
     return jsonify({
-        "status": "online",
-        "app": APP_NAME
+        "key": key,
+        "status": "active"
     })
 
-# ====== KEY VERIFY (APP USE KAREGA) ======
-@app.route("/verify", methods=["POST"])
+# ✅ key verify (Android app yahan hit karega)
+@app.route("/verify-key", methods=["GET"])
 def verify_key():
-    data = request.json
-    if not data or "key" not in data:
-        return jsonify({"status": "error", "msg": "key missing"}), 400
+    key = request.args.get("key")
 
-    key = data["key"]
+    if not key:
+        return jsonify({"valid": False, "reason": "no key"})
 
-    if key in KEYS_DB and KEYS_DB[key]["active"]:
-        return jsonify({
-            "status": "success",
-            "msg": "key valid",
-            "key": key
-        })
-    else:
-        return jsonify({
-            "status": "failed",
-            "msg": "invalid or disabled key"
-        }), 403
+    data = KEYS.get(key)
 
-# ====== ADMIN: CREATE KEY ======
-@app.route("/admin/create_key", methods=["POST"])
-def create_key():
-    token = request.headers.get("Owner-Token")
-    if token != OWNER_TOKEN:
-        return jsonify({"error": "unauthorized"}), 401
+    if not data:
+        return jsonify({"valid": False, "reason": "invalid key"})
 
-    data = request.json
-    new_key = data.get("key")
+    if not data["active"]:
+        return jsonify({"valid": False, "reason": "key disabled"})
 
-    if not new_key:
-        return jsonify({"error": "key required"}), 400
+    return jsonify({"valid": True})
 
-    KEYS_DB[new_key] = {
-        "active": True,
-        "created": int(time.time()),
-        "note": data.get("note", "")
-    }
-
-    return jsonify({"status": "created", "key": new_key})
-
-# ====== ADMIN: DISABLE KEY ======
-@app.route("/admin/disable_key", methods=["POST"])
-def disable_key():
-    token = request.headers.get("Owner-Token")
-    if token != OWNER_TOKEN:
-        return jsonify({"error": "unauthorized"}), 401
-
-    data = request.json
-    key = data.get("key")
-
-    if key in KEYS_DB:
-        KEYS_DB[key]["active"] = False
-        return jsonify({"status": "disabled", "key": key})
-    else:
-        return jsonify({"error": "key not found"}), 404
-
-# ====== ADMIN: LIST KEYS ======
-@app.route("/admin/keys", methods=["GET"])
-def list_keys():
-    token = request.headers.get("Owner-Token")
-    if token != OWNER_TOKEN:
-        return jsonify({"error": "unauthorized"}), 401
-
-    return jsonify(KEYS_DB)
-
-# ====== RUN ======
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
-    
+    app.run(host="0.0.0.0", port=5000)
